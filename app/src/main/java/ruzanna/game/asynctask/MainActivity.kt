@@ -1,13 +1,12 @@
 package ruzanna.game.asynctask
 
-import android.annotation.SuppressLint
 import android.app.ProgressDialog
-import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
 import android.view.View
+import android.widget.TextView
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity(), GetCountFragment.GetCountFragmentListener {
     private var count: Int = 0
@@ -19,109 +18,73 @@ class MainActivity : AppCompatActivity(), GetCountFragment.GetCountFragmentListe
         setContentView(R.layout.activity_main)
         getCountFragment.listener = this
         getCountFragment.show(supportFragmentManager, "GetCountFragment")
-        count_now.text = count.toString()
         val progressDialog = ProgressDialog(this@MainActivity)
 
-        add_count.setOnClickListener {
-            Log.i("add_count", "test")
-            val asyncTask = @SuppressLint("StaticFieldLeak")
-            object : AsyncTask<Void, Int, String>() {
-
-                override fun onPreExecute() {
-                    super.onPreExecute()
-                    progressDialog.setTitle("AsyncTask Test")
-                    progressDialog.setMessage("Loading ... ")
-                    progressDialog.show()
-                }
-
-                override fun doInBackground(vararg params: Void?): String {
-                    Thread.sleep(1000)
-                    val countNow = count_now.text.toString().toInt()
-                    if (countNow == maxCount)
-                        return "reset"
-                    return (countNow + 1).toString()
-                }
-
-                override fun onPostExecute(result: String?) {
-                    super.onPostExecute(result)
-                    if (result != "reset"){
-                        count_now.text = result
-                    }
-                    else{
-                        reset.visibility = View.VISIBLE
-                    }
-                    progressDialog.dismiss()
-                }
-            }
-            asyncTask.execute()
-        }
-
         reset.setOnClickListener {
-            Log.i("reset", "test")
-            val asyncTask = @SuppressLint("StaticFieldLeak")
-            object : AsyncTask<Void, Int, String>() {
-
-                override fun onPreExecute() {
-                    super.onPreExecute()
-                    progressDialog.setTitle("AsyncTask Test")
-                    progressDialog.setMessage("Loading ... ")
-                    progressDialog.show()
-                }
-
-                override fun doInBackground(vararg params: Void?): String? {
-                    Thread.sleep(1000)
-                    return count.toString()
-                }
-
-                override fun onPostExecute(result: String?) {
-                    super.onPostExecute(result)
-                    count_now.text = result
-                    reset.visibility = View.INVISIBLE
-                    progressDialog.dismiss()
-                }
-            }
-            asyncTask.execute()
+            count_now.text = count.toString()
+            reset.visibility = View.INVISIBLE
         }
 
+        add_count.setOnClickListener {
+            GlobalScope.launch(Dispatchers.Main) {
+                progressDialog.setTitle("Coroutine Test")
+                progressDialog.setMessage("Add ... ")
+                progressDialog.show()
+
+                val res = async(Dispatchers.Default) {
+                    getCount(count_now, true)
+                }
+                count_now.text = res.await()
+                resetButton(count_now.text.toString().toInt())
+                progressDialog.dismiss()
+            }
+        }
         minus_count.setOnClickListener {
-            val asyncTask = @SuppressLint("StaticFieldLeak")
-            object : AsyncTask<Void, Int, String>() {
+            GlobalScope.launch(Dispatchers.Main) {
+                progressDialog.setTitle("Coroutine Test")
+                progressDialog.setMessage("Minus ... ")
+                progressDialog.show()
 
-                override fun onPreExecute() {
-                    super.onPreExecute()
-                    progressDialog.setTitle("AsyncTask Test")
-                    progressDialog.setMessage("Loading ... ")
-                    progressDialog.show()
+                val res = async(Dispatchers.Default) {
+                    getCount(count_now, false)
                 }
-
-                override fun doInBackground(vararg params: Void?): String {
-                    Thread.sleep(1000)
-                    val countNow = count_now.text.toString().toInt()
-                    if (countNow == 0)
-                        return "reset"
-                    return (countNow - 1).toString()
-                }
-
-                override fun onPostExecute(result: String?) {
-                    super.onPostExecute(result)
-                    if (result != "reset"){
-                        count_now.text = result
-                    }
-                    else{
-                        reset.visibility = View.VISIBLE
-                    }
-                    progressDialog.dismiss()
-                }
+                count_now.text = res.await()
+                resetButton(count_now.text.toString().toInt())
+                progressDialog.dismiss()
             }
-            asyncTask.execute()
         }
 
+    }
 
+    private fun resetButton(countNow: Int){
+        if (countNow == maxCount || countNow == 0)
+            reset.visibility = View.VISIBLE
+        else
+            reset.visibility = View.INVISIBLE
     }
 
     override fun getGetCounts(count: Int, maxCount: Int) {
         getCountFragment.dismiss()
         this.count = count
+        count_now.text = count.toString()
         this.maxCount = maxCount
     }
+
+    private suspend fun getCount(countNow: TextView, boolean: Boolean): String{
+        delay(1000)
+        val res = countNow.text.toString().toInt()
+        return if(boolean){
+            if(res < maxCount )
+                (res + 1).toString()
+            else
+                res.toString()
+        }else{
+            if(res > 0 )
+                (res - 1).toString()
+            else
+                res.toString()
+        }
+    }
+
+
 }
